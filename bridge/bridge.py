@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# © 2026 Prof. Di Filippo Davide. Vedi LICENSE.
 """
 Bridge SCADA <-> OpenPLC per l'impianto chimico.
 

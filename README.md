@@ -101,3 +101,15 @@ RESET tenuto premuto 3 s a impianto fermo azzera il ciclo.
   sono stati provati con il PLC demo.
 - Non è stato provato con l'Editor e il runtime v4 veri: controlla in particolare le dimensioni dei
   segmenti del server Modbus (`%MW`, `%QX`).
+
+## Licenza
+
+© 2026 Prof. Di Filippo Davide.
+
+- **Codice** (programma ST, bridge Python, JavaScript, CSS e struttura HTML):
+  [GNU GPL versione 3 o successiva](LICENSE). Le versioni modificate e ridistribuite devono restare sotto GPL.
+- **Contenuti didattici** (testi, consegne, dati dell'impianto, tabelle, figure): [Creative Commons
+  Attribuzione - Condividi allo stesso modo 4.0 Internazionale (CC BY-SA 4.0)](LICENSE-CONTENUTI).
+
+**Termine aggiuntivo (GPLv3, sezione 7b):** le versioni modificate devono mantenere visibile
+nelle pagine la dicitura "Autore originale: Prof. Di Filippo Davide".

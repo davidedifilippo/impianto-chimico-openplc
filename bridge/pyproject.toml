@@ -3,6 +3,8 @@ name = "bridge-impianto-chimico"
 version = "1.0.0"
 description = "Bridge WebSocket <-> Modbus TCP tra lo SCADA didattico e OpenPLC"
 requires-python = ">=3.10"
+license = "GPL-3.0-or-later"
+authors = [{ name = "Prof. Di Filippo Davide" }]
 dependencies = [
     "aiohttp>=3.9",
     "pymodbus>=3.6",

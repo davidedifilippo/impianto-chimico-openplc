@@ -1,7 +1,10 @@
 (* =====================================================================
    IMPIANTO CHIMICO - PREPARAZIONE, TRATTAMENTO TERMICO E STOCCAGGIO
    Programma per OpenPLC (IEC 61131-3, Structured Text)
-   Prof. Di Filippo Davide
+   Autore: Prof. Di Filippo Davide
+   Licenza: GNU GPL v3 o successiva (SPDX: GPL-3.0-or-later), vedi LICENSE.
+   Termine aggiuntivo (GPLv3, sez. 7b): le versioni modificate devono mantenere
+   la dicitura "Autore originale: Prof. Di Filippo Davide".
 
    Ciclo di un lotto:
      10 RIEMPIMENTO   saracinesca aperta fino al livello massimo (80 L)
