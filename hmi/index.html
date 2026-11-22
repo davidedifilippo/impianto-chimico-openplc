@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Impianto chimico · SCADA didattico OpenPLC</title>
+<style>
+:root{
+  --bg:#0a0f1a; --panel:#111a2b; --panel2:#0d1524; --line:#1f2c45; --line2:#2a3b5c;
+  --txt:#dbe6ff; --mut:#7f93b8; --dim:#4d5f82;
+  --blue:#3aa8ff; --cyan:#35e0d0; --amber:#ffb547; --green:#3ee08a; --red:#ff4d5e; --yellow:#ffd23f; --violet:#a78bfa;
+  --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --sans:"Inter","SF Pro Text",-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{background:radial-gradient(1400px 800px at 20% -10%,#14223d 0%,var(--bg) 60%) no-repeat;}
+html,body{margin:0;color:var(--txt);font-family:var(--sans);font-size:14px}
+button{font-family:inherit}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:14px 22px;padding:14px 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0f1830,#0b1222)}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:38px;height:38px;border-radius:10px;background:conic-gradient(from 210deg,var(--cyan),var(--blue),var(--violet),var(--cyan));display:grid;place-items:center;box-shadow:0 0 18px #35e0d055}
+.logo svg{width:22px;height:22px}
+.brand h1{font-size:17px;margin:0;letter-spacing:.2px}
+.brand small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+.hstat{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto;align-items:center}
+.chip{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12px;color:var(--mut)}
+.chip b{color:var(--txt);font-family:var(--mono);font-weight:600}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--dim)}
+.dot.ok{background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.bad{background:var(--red);box-shadow:0 0 8px var(--red)}
+.dot.wait{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{background:none;border:0;color:var(--mut);padding:6px 12px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600}
+.seg button.on{background:#1d2c4a;color:var(--txt);box-shadow:inset 0 0 0 1px var(--line2)}
+.wsbox{display:none;align-items:center;gap:6px}
+.wsbox input{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 8px;font-family:var(--mono);font-size:12px;width:190px}
+.btn{background:#1b2944;border:1px solid var(--line2);color:var(--txt);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600}
+.btn:hover{background:#22355a}
+
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;padding:14px 20px;align-items:start}
+.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.card h3{margin:0;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.card h3 .r{margin-left:auto;text-transform:none;letter-spacing:0;font-family:var(--mono);color:var(--dim)}
+.scene{position:relative}
+.scene svg{display:block;width:100%;height:auto}
+.banner{position:absolute;left:14px;top:12px;display:flex;flex-direction:column;gap:6px;pointer-events:none;max-width:60%}
+.toast{font-size:12px;font-weight:600;padding:7px 11px;border-radius:9px;backdrop-filter:blur(4px);border:1px solid;animation:pop .25s ease}
+.toast.red{background:#3a0f18cc;border-color:#ff4d5e88;color:#ffc2c8}
+.toast.amb{background:#3a2a0bcc;border-color:#ffb54788;color:#ffe2b0}
+@keyframes pop{from{transform:translateY(-6px);opacity:0}}
+.side{display:flex;flex-direction:column;gap:14px}
+
+/* pannello operatore */
+.opanel{padding:16px 14px 18px;background:
+  repeating-linear-gradient(135deg,#0000 0 10px,#ffffff05 10px 11px),linear-gradient(180deg,#1a2335,#121a29)}
+.lamps{display:flex;justify-content:space-around;margin-bottom:16px}
+.lamp{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:var(--mut)}
+.lamp i{width:38px;height:38px;border-radius:50%;border:3px solid #2c3546;background:radial-gradient(circle at 35% 30%,#ffffff33,#0000 45%),var(--off,#333);transition:.15s}
+.lamp.y i{--off:#4a3f12}.lamp.g i{--off:#123d26}.lamp.r i{--off:#481219}
+.lamp.y.on i{--off:var(--yellow);box-shadow:0 0 22px var(--yellow),0 0 50px #ffd23f66}
+.lamp.g.on i{--off:var(--green);box-shadow:0 0 22px var(--green),0 0 50px #3ee08a66}
+.lamp.r.on i{--off:var(--red);box-shadow:0 0 22px var(--red),0 0 50px #ff4d5e66}
+.pbtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end}
+.pb{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11px;color:var(--mut);user-select:none;-webkit-user-select:none}
+.pb button{width:58px;height:58px;border-radius:50%;border:5px solid #3a4457;cursor:pointer;box-shadow:0 5px 0 #05080f,inset 0 -6px 10px #0005,inset 0 4px 8px #fff3;transition:transform .05s,box-shadow .05s;touch-action:none}
+.pb button:active,.pb button.down{transform:translateY(4px);box-shadow:0 1px 0 #05080f,inset 0 -3px 8px #0006}
+.pb.start button{background:radial-gradient(circle at 40% 35%,#6ff2a8,#13a85a)}
+.pb.stop button{background:radial-gradient(circle at 40% 35%,#ff8c95,#c5162b)}
+.pb.reset button{background:radial-gradient(circle at 40% 35%,#8ac8ff,#1f6fd1)}
+.pb small{font-family:var(--mono);color:var(--dim);font-size:10px}
+.emer{display:flex;align-items:center;gap:16px;margin-top:18px;padding-top:16px;border-top:1px dashed var(--line2)}
+.mush{position:relative;width:96px;height:96px;flex:none;border-radius:50%;background:radial-gradient(circle,#ffd23f 0 62%,#d9a800 63% 70%,#1a1a1a 71%);display:grid;place-items:center;cursor:pointer;user-select:none;-webkit-user-select:none}
+.mush .cap{width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 38% 30%,#ff99a0,#e0142c 55%,#8d0716);box-shadow:0 8px 0 #4a020a,0 10px 14px #000a,inset 0 -4px 10px #0006;transition:.12s}
+.mush.down .cap{transform:translateY(6px) scale(.96);box-shadow:0 2px 0 #4a020a,0 3px 6px #000a,inset 0 -4px 10px #0008}
+.mush .ring{position:absolute;inset:3px;border-radius:50%;}
+.mush .ring text{font-size:7.2px;font-weight:800;fill:#3a2a00;letter-spacing:.5px}
+.emer p{margin:0;font-size:12px;color:var(--mut);line-height:1.45}
+.emer p b{color:var(--txt)}
+
+/* sequenza */
+.steps{list-style:none;margin:0;padding:8px 8px 10px}
+.steps li{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;font-size:12.5px;color:var(--mut);position:relative}
+.steps li .n{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center;border:1px solid var(--line2);border-radius:6px;padding:2px 0}
+.steps li .v{font-family:var(--mono);font-size:11px}
+.steps li .bar{grid-column:2/4;height:4px;border-radius:2px;background:#ffffff0d;overflow:hidden;display:none}
+.steps li .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--blue))}
+.steps li.act{background:linear-gradient(90deg,#1a3a5c,#14223a);color:var(--txt);box-shadow:inset 3px 0 0 var(--cyan)}
+.steps li.act .n{border-color:var(--cyan);color:var(--cyan);background:#35e0d014}
+.steps li.act .bar{display:block}
+.steps li.done{color:#5d7096}
+.steps li.done .n{color:var(--green);border-color:#3ee08a55}
+.steps .sub{padding-left:16px;border-left:1px dashed var(--line2);margin-left:22px}
+.alarm{margin:0 10px 10px;padding:9px 11px;border-radius:9px;font-size:12px;display:none;border:1px solid}
+.alarm.show{display:block}
+.alarm.e{background:#3a0f18;border-color:#ff4d5e;color:#ffc2c8}
+.alarm.a{background:#3a1c0b;border-color:#ff8a3d;color:#ffd5b8}
+
+.bottom{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:14px;padding:0 20px 14px;align-items:start}
+.bottom2{display:grid;grid-template-columns:1fr 1.25fr;gap:14px;padding:0 20px 24px}
+canvas{display:block;width:100%}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td,th{padding:5px 10px;border-bottom:1px solid #ffffff08;text-align:left;white-space:nowrap}
+th{color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.8px}
+td.m{font-family:var(--mono);color:var(--mut);font-size:11.5px}
+td.val{font-family:var(--mono);text-align:right}
+.led{display:inline-block;width:10px;height:10px;border-radius:50%;background:#1d2638;border:1px solid #2f3b55;vertical-align:-1px}
+.led.on{background:var(--green);border-color:var(--green);box-shadow:0 0 8px var(--green)}
+.led.ono{background:var(--amber);border-color:var(--amber);box-shadow:0 0 8px var(--amber)}
+.iogrid{display:grid;grid-template-columns:1fr 1fr}
+.iogrid > div:first-child{border-right:1px solid var(--line)}
+.sub-h{font-size:11px;color:var(--cyan);padding:8px 10px 2px;font-weight:700;letter-spacing:.6px}
+.sub-h.o{color:var(--amber)}
+
+.faults{padding:8px 10px 12px;display:flex;flex-direction:column;gap:6px}
+.flt{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:9px;border:1px solid var(--line);background:#0b1220;cursor:pointer;font-size:12.5px;user-select:none;transition:.15s}
+.flt:hover{border-color:var(--line2)}
+.flt .sw{width:30px;height:17px;border-radius:9px;background:#26324a;position:relative;flex:none;transition:.15s}
+.flt .sw::after{content:"";position:absolute;width:13px;height:13px;border-radius:50%;background:#8796b5;left:2px;top:2px;transition:.15s}
+.flt.on{border-color:#ff4d5e88;background:#2a0d15}
+.flt.on .sw{background:var(--red)}
+.flt.on .sw::after{left:15px;background:#fff}
+.flt .tag{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--dim)}
+.flt.act{border-style:dashed}
+.flt.act.on{border-color:#ffb54788;background:#2a1f0b}
+.flt.act.on .sw{background:var(--amber)}
+.fbtns{display:flex;gap:8px;padding:0 10px 12px}
+.fbtns .btn{flex:1}
+
+.log{height:250px;overflow:auto;font-family:var(--mono);font-size:11.5px;padding:6px 0}
+.log div{padding:3px 12px;display:grid;grid-template-columns:62px 1fr;gap:8px;border-bottom:1px solid #ffffff05}
+.log div span{color:var(--dim)}
+.log .i{color:#9fb3d9}.log .o{color:var(--amber)}.log .w{color:#ffcf7a}.log .e{color:#ff8d98}.log .g{color:var(--green)}.log .s{color:var(--cyan)}
+.qc{padding:6px 4px 10px}
+.qc td{font-size:12px}
+.qc .ok{color:var(--green);font-weight:700}
+.qc .ko{color:var(--red);font-weight:700}
+.qc .na{color:var(--dim)}
+.why{font-size:11px;color:#ff9aa4;padding:0 12px 10px;line-height:1.5}
+.ksel{display:flex;gap:4px}
+.ksel button{padding:5px 9px}
+.ksel button.on{background:#24467a;border-color:var(--blue);color:#fff}
+.hint{font-size:11.5px;color:var(--mut);padding:8px 14px 12px;line-height:1.5}
+@media (max-width:1100px){.wrap{grid-template-columns:1fr}.bottom,.bottom2{grid-template-columns:1fr}.side{display:grid;grid-template-columns:1fr 1fr}}
+@media (max-width:700px){.side{grid-template-columns:1fr}.wrap,.bottom,.bottom2{padding-left:10px;padding-right:10px}.hstat{margin-left:0}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#06101f" stroke-width="2.2" stroke-linecap="round"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7.5 15h9"/></svg></div>
+    <div><h1>Impianto chimico · miscelazione e trattamento termico</h1><small>SCADA didattico · messa in servizio virtuale con OpenPLC</small></div>
+  </div>
+  <div class="hstat">
+    <div class="seg" id="modeSeg"><button data-m="demo" class="on">PLC demo interno</button><button data-m="plc">OpenPLC</button></div>
+    <div class="wsbox" id="wsbox"><input id="wsurl" value=""><button class="btn" id="wsconn">Connetti</button></div>
+    <div class="chip"><span class="dot" id="linkDot"></span><span id="linkTxt">PLC demo attivo</span></div>
+    <div class="chip">Scala tempi <b id="kTxt">×30</b>
+      <div class="ksel" id="ksel"><button class="btn" data-k="1">1</button><button class="btn" data-k="10">10</button><button class="btn" data-k="30">30</button><button class="btn" data-k="60">60</button></div></div>
+    <div class="chip">Tempo di processo <b id="ptime">00:00:00</b></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="card scene">
+    <svg id="scene" viewBox="0 0 1200 640" aria-label="Sinottico dell'impianto">
+      <defs>
+        <linearGradient id="gSteel" x1="0" x2="1"><stop offset="0" stop-color="#2a3956"/><stop offset=".45" stop-color="#5a6f96"/><stop offset=".55" stop-color="#6f86b0"/><stop offset="1" stop-color="#23314d"/></linearGradient>
+        <linearGradient id="gSteelV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6c82ab"/><stop offset="1" stop-color="#263552"/></linearGradient>
+        <linearGradient id="gGlass" x1="0" x2="1"><stop offset="0" stop-color="#ffffff10"/><stop offset=".2" stop-color="#ffffff28"/><stop offset=".35" stop-color="#ffffff08"/><stop offset="1" stop-color="#ffffff05"/></linearGradient>
+        <linearGradient id="gLiq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" id="liqTop" stop-color="#5cc2ff"/><stop offset="1" id="liqBot" stop-color="#1b5fb0"/></linearGradient>
+        <linearGradient id="gBelt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3140"/><stop offset="1" stop-color="#141821"/></linearGradient>
+        <linearGradient id="gFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16213a"/><stop offset="1" stop-color="#0a0f1a"/></linearGradient>
+        <radialGradient id="gHeat" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffcf5a"/><stop offset=".5" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ff1f1f00"/></radialGradient>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+        <pattern id="pBrick" width="12" height="8" patternUnits="userSpaceOnUse"><rect width="12" height="8" fill="#b9733c"/><path d="M0 4h12M6 0v4M0 4v4M12 4v4" stroke="#7d4520" stroke-width="1"/></pattern>
+        <pattern id="pGrid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#ffffff06"/></pattern>
+        <clipPath id="tankClip"><path d="M362 136 H578 V382 L486 440 H454 L362 382 Z"/></clipPath>
+        <marker id="arr" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4d5f82"/></marker>
+      </defs>
+      <rect width="1200" height="640" fill="url(#pGrid)"/>
+      <rect y="612" width="1200" height="28" fill="url(#gFloor)"/>
+      <line x1="0" y1="612" x2="1200" y2="612" stroke="#2a3b5c"/>
+      <ellipse id="puddle" cx="470" cy="618" rx="0" ry="0" fill="#ffb54766"/>
+      <ellipse id="puddle2" cx="600" cy="618" rx="0" ry="0" fill="#5cc2ff55"/>
+      <path id="cascade" d="M584 132 C600 132 596 150 596 170 L596 612" stroke="#5cc2ff" stroke-width="5" fill="none" stroke-dasharray="14 8" opacity="0"/>
+
+      <!-- ====== alimentazione liquido ====== -->
+      <g id="supply">
+        <text x="22" y="64" fill="#7f93b8" font-size="12" font-weight="700" letter-spacing="1">LIQUIDO</text>
+        <rect x="18" y="72" width="60" height="44" rx="6" fill="#132037" stroke="#2a3b5c"/>
+        <rect x="24" y="84" width="48" height="26" rx="3" fill="#1b5fb0" opacity=".8"/>
+        <path d="M78 98 H250" stroke="url(#gSteelV)" stroke-width="14" fill="none"/>
+        <path d="M290 98 H382 V140" stroke="url(#gSteelV)" stroke-width="14" fill="none" stroke-linejoin="round"/>
+        <path id="flowIn" d="M78 98 H250 M290 98 H382 V150" stroke="#7fd3ff" stroke-width="5" fill="none" stroke-dasharray="10 12" opacity="0" stroke-linejoin="round"/>
+        <!-- saracinesca -->
+        <g id="gate" transform="translate(270 98)">
+          <rect x="-24" y="-14" width="48" height="28" rx="4" fill="#1a2740" stroke="#3b4e74"/>
+          <path d="M-18 -12 L0 0 L-18 12 Z M18 -12 L0 0 L18 12 Z" fill="#30405f" stroke="#7f93b8" id="gateBody"/>
+          <rect x="-4" y="-40" width="8" height="26" fill="#3b4e74"/>
+          <rect id="gatePlate" x="-10" y="-10" width="20" height="20" fill="#7f93b8" opacity=".9"/>
+          <rect x="-16" y="-58" width="32" height="20" rx="4" fill="#1a2740" stroke="#3b4e74"/>
+          <text x="0" y="-44" fill="#7f93b8" font-size="10" text-anchor="middle" font-family="monospace">YV1</text>
+        </g>
+        <text x="270" y="134" fill="#7f93b8" font-size="11" text-anchor="middle">saracinesca di mandata</text>
+      </g>
+
+      <!-- ====== tramoggia ====== -->
+      <g id="tank">
+        <path d="M356 130 H584 V384 L489 446 H451 L356 384 Z" fill="#0d1628" stroke="url(#gSteel)" stroke-width="8" stroke-linejoin="round"/>
+        <g clip-path="url(#tankClip)">
+          <path id="liquid" d="" fill="url(#gLiq)"/>
+          <g id="tankBricks"></g>
+          <g id="bubbles"></g>
+        </g>
+        <path d="M362 136 H578 V382 L486 440 H454 L362 382 Z" fill="url(#gGlass)" pointer-events="none"/>
+        <!-- scala volumi -->
+        <g font-size="10" fill="#4d5f82" font-family="monospace">
+          <line x1="596" y1="160" x2="606" y2="160" stroke="#4d5f82"/><text x="610" y="164">80 L</text>
+          <line x1="596" y1="223" x2="604" y2="223" stroke="#4d5f82"/><text x="610" y="227">60</text>
+          <line x1="596" y1="286" x2="604" y2="286" stroke="#4d5f82"/><text x="610" y="290">40</text>
+          <line x1="596" y1="349" x2="604" y2="349" stroke="#4d5f82"/><text x="610" y="353">20</text>
+        </g>
+        <!-- sensore livello -->
+        <g id="lsh" transform="translate(356 160)">
+          <rect x="-34" y="-11" width="30" height="22" rx="4" fill="#1a2740" stroke="#3b4e74"/>
+          <line x1="-4" y1="0" x2="20" y2="0" stroke="#9fb3d9" stroke-width="3"/>
+          <circle id="lshLed" cx="-19" cy="0" r="5" fill="#1d2638"/>
+          <text x="-19" y="-16" fill="#7f93b8" font-size="10" text-anchor="middle" font-family="monospace">SL</text>
+        </g>
+        <!-- volume -->
+        <g transform="translate(470 470)"><rect x="-1" y="0" width="0" height="0"/></g>
+        <!-- mescolatore -->
+        <g id="mixer">
+          <line x1="470" y1="96" x2="470" y2="402" stroke="#9fb3d9" stroke-width="5"/>
+          <path id="blade1" d="" fill="#c3d2f0" stroke="#5a6f96"/>
+          <path id="blade2" d="" fill="#c3d2f0" stroke="#5a6f96"/>
+          <rect x="436" y="44" width="68" height="56" rx="10" fill="#1d2b47" stroke="#4a6191" stroke-width="2"/>
+          <g id="fan" transform="translate(470 72)"><circle r="17" fill="#0d1628" stroke="#4a6191"/><path d="M0 -14 L4 0 L0 14 L-4 0Z M-14 0 L0 -4 L14 0 L0 4Z" fill="#6f86b0"/></g>
+          <text x="470" y="38" fill="#7f93b8" font-size="11" text-anchor="middle" font-family="monospace">M1 3~  KM2</text>
+          <rect x="372" y="186" width="84" height="34" rx="8" fill="#0a1220cc" stroke="#2a3b5c"/>
+          <text id="volTxt" x="414" y="209" fill="#dbe6ff" font-size="17" font-weight="700" text-anchor="middle" font-family="monospace">0.0 L</text>
+          <g id="thermal" transform="translate(518 60)"><rect x="0" y="0" width="38" height="20" rx="4" fill="#1a2740" stroke="#3b4e74"/><text x="19" y="14" font-size="10" text-anchor="middle" fill="#7f93b8" font-family="monospace">FR</text><circle id="frLed" cx="45" cy="10" r="5" fill="#3ee08a"/></g>
+        </g>
+      </g>
+
+      <!-- ====== nastro panetti ====== -->
+      <g id="beltG">
+        <text x="760" y="40" fill="#7f93b8" font-size="12" font-weight="700" letter-spacing="1">NASTRO PANETTI · M2</text>
+        <rect x="560" y="92" width="370" height="16" rx="8" fill="url(#gBelt)" stroke="#3b4e74"/>
+        <path id="beltMarks" d="" stroke="#3b4e74" stroke-width="2"/>
+        <g id="beltRollers"></g>
+        <line x1="600" y1="108" x2="600" y2="150" stroke="#2a3b5c" stroke-width="4"/>
+        <line x1="900" y1="108" x2="900" y2="150" stroke="#2a3b5c" stroke-width="4"/>
+        <g id="belt-motor" transform="translate(930 100)"><circle r="18" fill="#1d2b47" stroke="#4a6191" stroke-width="2"/><text y="4" font-size="10" text-anchor="middle" fill="#9fb3d9" font-family="monospace">M2</text></g>
+        <g id="bricks"></g>
+        <!-- fotocellula -->
+        <g id="pe">
+          <rect x="516" y="104" width="12" height="16" rx="2" fill="#1a2740" stroke="#3b4e74"/>
+          <rect x="574" y="104" width="12" height="16" rx="2" fill="#1a2740" stroke="#3b4e74"/>
+          <line id="peBeam" x1="528" y1="112" x2="574" y2="112" stroke="#ff4d5e" stroke-width="2" stroke-dasharray="3 3" opacity=".7"/>
+          <text x="551" y="134" fill="#7f93b8" font-size="10" text-anchor="middle" font-family="monospace">FC1</text>
+        </g>
+        <g id="falling"></g>
+      </g>
+
+      <!-- ====== scarico ====== -->
+      <g id="drain">
+        <rect x="462" y="446" width="16" height="22" fill="url(#gSteel)"/>
+        <g transform="translate(470 482)">
+          <path d="M-20 -12 L0 0 L-20 12 Z M20 -12 L0 0 L20 12 Z" id="drainValve" fill="#30405f" stroke="#7f93b8"/>
+          <rect x="-11" y="-38" width="22" height="22" rx="3" fill="#1a2740" stroke="#3b4e74"/>
+          <line x1="0" y1="-16" x2="0" y2="-2" stroke="#7f93b8" stroke-width="2"/>
+          <text x="-42" y="-24" fill="#7f93b8" font-size="10" text-anchor="middle" font-family="monospace">YV2</text>
+        </g>
+        <rect x="463" y="494" width="14" height="10" fill="url(#gSteel)"/>
+        <path id="stream" d="" stroke="#ffb547" stroke-width="7" stroke-linecap="round" opacity="0" fill="none"/>
+        <text x="560" y="492" fill="#7f93b8" font-size="10" font-family="monospace">5 L/min</text>
+      </g>
+
+      <!-- ====== rulliera, stazione, magazzino ====== -->
+      <g id="conv">
+        <rect x="20" y="580" width="900" height="10" rx="5" fill="#1d2638" stroke="#2f3b55"/>
+        <g id="rollers"></g>
+        <rect x="415" y="588" width="110" height="10" rx="3" fill="#2a1a12" stroke="#5a3520"/>
+        <rect id="heatPlate" x="415" y="588" width="110" height="10" rx="3" fill="#ff5a1f" opacity="0"/>
+        <ellipse id="heatGlow" cx="470" cy="584" rx="80" ry="26" fill="url(#gHeat)" opacity="0" filter="url(#soft)"/>
+        <text x="470" y="611" fill="#7f93b8" font-size="10" text-anchor="middle" font-family="monospace">riscaldatore R · 0–10 V</text>
+        <g id="convMotor" transform="translate(40 600)"><circle r="12" fill="#1d2b47" stroke="#4a6191" stroke-width="2"/><text y="4" font-size="9" text-anchor="middle" fill="#9fb3d9" font-family="monospace">M3</text></g>
+        <text x="20" y="500" fill="#7f93b8" font-size="12" font-weight="700" letter-spacing="1">CASSE VUOTE →</text>
+        <!-- sensori casse -->
+        <g id="fcCassa"><line x1="505" y1="528" x2="505" y2="578" stroke="#3ee08a" stroke-width="2" stroke-dasharray="3 3" id="fcCassaBeam" opacity=".25"/><rect x="499" y="520" width="12" height="9" rx="2" fill="#1a2740" stroke="#3b4e74"/><text x="520" y="527" fill="#7f93b8" font-size="10" font-family="monospace">FC2</text></g>
+        <g id="fcMag"><line x1="830" y1="528" x2="830" y2="578" stroke="#3ee08a" stroke-width="2" stroke-dasharray="3 3" id="fcMagBeam" opacity=".25"/><rect x="824" y="520" width="12" height="9" rx="2" fill="#1a2740" stroke="#3b4e74"/><text x="806" y="516" fill="#7f93b8" font-size="10" font-family="monospace">FC3</text></g>
+        <!-- sonda -->
+        <g id="probe"><rect x="526" y="456" width="24" height="16" rx="3" fill="#1a2740" stroke="#3b4e74"/><text x="538" y="468" font-size="9" text-anchor="middle" fill="#9fb3d9" font-family="monospace">TT</text><line id="probeRod" x1="538" y1="472" x2="538" y2="500" stroke="#c3d2f0" stroke-width="3"/></g>
+        <g id="tempBadge" transform="translate(616 420)">
+          <rect x="0" y="0" width="118" height="54" rx="10" fill="#0a1220cc" stroke="#2a3b5c"/>
+          <text x="10" y="17" font-size="10" fill="#7f93b8" font-family="monospace">TEMP. CASSA</text>
+          <text id="tempTxt" x="10" y="43" font-size="22" font-weight="700" fill="#dbe6ff" font-family="monospace">20.0°C</text>
+        </g>
+        <g id="voltBadge" transform="translate(616 362)">
+          <rect x="0" y="0" width="118" height="50" rx="10" fill="#0a1220cc" stroke="#2a3b5c"/>
+          <text x="10" y="17" font-size="10" fill="#7f93b8" font-family="monospace">RISCALDATORE</text>
+          <text id="voltTxt" x="10" y="40" font-size="18" font-weight="700" fill="#ffb547" font-family="monospace">0.00 V</text>
+        </g>
+        <g id="crates"></g>
+        <g id="steam"></g>
+      </g>
+
+      <g id="warehouse">
+        <rect x="880" y="300" width="300" height="312" rx="8" fill="#0e1729" stroke="#2a3b5c" stroke-width="2"/>
+        <text x="1030" y="324" fill="#7f93b8" font-size="12" font-weight="700" text-anchor="middle" letter-spacing="1">MAGAZZINO</text>
+        <rect x="920" y="542" width="0" height="0"/>
+        <g id="rack">
+          <line x1="905" y1="418" x2="1160" y2="418" stroke="#3b4e74" stroke-width="4"/>
+          <line x1="905" y1="508" x2="1160" y2="508" stroke="#3b4e74" stroke-width="4"/>
+          <line x1="905" y1="340" x2="905" y2="508" stroke="#3b4e74" stroke-width="4"/>
+          <line x1="1032" y1="340" x2="1032" y2="508" stroke="#3b4e74" stroke-width="3"/>
+          <line x1="1160" y1="340" x2="1160" y2="508" stroke="#3b4e74" stroke-width="4"/>
+        </g>
+        <g id="stored"></g>
+        <rect x="880" y="530" width="300" height="82" fill="#0b1220" opacity=".6"/>
+        <text id="storeTxt" x="1030" y="566" fill="#dbe6ff" font-size="20" font-weight="700" text-anchor="middle" font-family="monospace">0 / 4</text>
+        <text x="1030" y="586" fill="#7f93b8" font-size="11" text-anchor="middle">casse stoccate</text>
+        <g id="lift"></g>
+      </g>
+
+      <!-- etichette di stato -->
+      <g id="phaseBadge" transform="translate(660 170)">
+        <rect width="200" height="56" rx="10" fill="#0a1220cc" stroke="#2a3b5c"/>
+        <text x="12" y="19" font-size="10" fill="#7f93b8" font-family="monospace">FASE (PLC %QW2)</text>
+        <text id="phaseTxt" x="12" y="43" font-size="16" font-weight="700" fill="#35e0d0">— riposo</text>
+      </g>
+      <g transform="translate(660 236)">
+        <rect width="200" height="52" rx="10" fill="#0a1220cc" stroke="#2a3b5c"/>
+        <text x="12" y="19" font-size="10" fill="#7f93b8" font-family="monospace">PANETTI IN TRAMOGGIA</text>
+        <g id="brickDots" transform="translate(14 30)"></g>
+      </g>
+    </svg>
+    <div class="banner" id="banner"></div>
+  </div>
+
+  <div class="side">
+    <div class="card">
+      <h3>Pannello operatore</h3>
+      <div class="opanel">
+        <div class="lamps">
+          <div class="lamp y" id="Lg"><i></i>IN FUNZIONE</div>
+          <div class="lamp g" id="Lv"><i></i>FERMO</div>
+          <div class="lamp r" id="Lr"><i></i>EMERGENZA</div>
+        </div>
+        <div class="pbtns">
+          <div class="pb start"><button id="bStart" aria-label="Start"></button>START<small>NA</small></div>
+          <div class="pb stop"><button id="bStop" aria-label="Stop"></button>STOP<small>NC</small></div>
+          <div class="pb reset"><button id="bReset" aria-label="Reset"></button>RESET<small>NA · 3 s azzera</small></div>
+        </div>
+        <div class="emer">
+          <div class="mush" id="mush" role="button" aria-label="Arresto di emergenza">
+            <svg class="ring" viewBox="0 0 100 100"><defs><path id="circ" d="M50 50 m-41 0 a41 41 0 1 1 82 0 a41 41 0 1 1 -82 0"/></defs><text><textPath href="#circ">ARRESTO DI EMERGENZA · EMERGENCY STOP ·</textPath></text></svg>
+            <div class="cap"></div>
+          </div>
+          <p id="mushTxt"><b>Fungo rilasciato.</b><br>Contatto NC chiuso. Clic per premere: resta bloccato finché non lo sblocchi.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Sequenza <span class="r" id="seqInfo">lotto 1</span></h3>
+      <div class="alarm" id="alarmBox"></div>
+      <ul class="steps" id="steps"></ul>
+    </div>
+  </div>
+</div>
+
+<div class="bottom">
+  <div class="card">
+    <h3>Andamento temperatura <span class="r">— T cassa · · 12·V riscaldatore</span></h3>
+    <canvas id="trend" height="250"></canvas>
+  </div>
+  <div class="card">
+    <h3>Guasti simulati <span class="r">iniettali e guarda il PLC</span></h3>
+    <div class="faults" id="faults"></div>
+    <div class="fbtns"><button class="btn" id="clearF">Ripara tutto</button><button class="btn" id="resetPlant">Nuovo impianto</button></div>
+  </div>
+  <div class="card">
+    <h3>Controllo qualità casse</h3>
+    <div class="qc"><table id="qcTab"><thead><tr><th>Cassa</th><th>Vol.</th><th>Mix</th><th>90°</th><th>60°</th><th>Esito</th></tr></thead><tbody></tbody></table></div>
+    <div class="why" id="qcWhy"></div>
+    <div class="hint">Requisiti: 20 ± 1 L · 5 panetti miscelati 5 min · almeno 20 min a 90 °C · almeno 5 min a 60 °C · mai oltre 100 °C.</div>
+  </div>
+</div>
+<div class="bottom2">
+  <div class="card">
+    <h3>Ingressi e uscite <span class="r">Modbus TCP · OpenPLC</span></h3>
+    <div class="iogrid">
+      <div><div class="sub-h">INGRESSI → PLC (holding reg. 1024+)</div><table id="tIn"></table></div>
+      <div><div class="sub-h o">USCITE ← PLC (coil 0+, holding reg. 0+)</div><table id="tOut"></table></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Registro eventi <span class="r" id="logCount"></span></h3>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   COSTANTI DI IMPIANTO
+   ===================================================================== */
+const Q_IN = 20;          // L/min saracinesca
+const Q_OUT = 5;          // L/min elettrovalvola di scarico
+const V_SENSOR = 79.8;    // L, commutazione sensore di livello
+const V_RIM = 88;         // L, bordo tramoggia (oltre: trabocco)
+const TAU = 240;          // s di processo, costante di tempo termica
+const T_AMB = 20;         // °C
+const MIX_TIME = 300;     // s di processo per miscelazione completa
+const STATION = 470, FC2_X = 505, FC3_X = 830, CRATE_W = 80, SPACING = 420;
+const CONV_SPEED = 105;   // px/s reali (non scalati)
+const BELT_SPEED = 60, BRICK_GAP = 120; // px/s reali, panetto ogni 2 s
+const BELT_END = 560, BEAM_Y = 112;
+const PULSE_MIN = 250;    // ms: tempo minimo di permanenza dei sensori (fotocellule)
+
+const PHASES = [
+  {n:0,  t:"Riposo / pronto"},
+  {n:10, t:"Riempimento tramoggia"},
+  {n:20, t:"Carico 5 panetti"},
+  {n:30, t:"Mescolazione 5 min"},
+  {n:40, t:"Arrivo cassa", sub:1},
+  {n:50, t:"Scarico 20 L", sub:1},
+  {n:60, t:"Riscaldo a 90 °C", sub:1},
+  {n:70, t:"Mantenimento 90 °C · 20 min", sub:1},
+  {n:80, t:"Raffreddo a 60 °C", sub:1},
+  {n:90, t:"Mantenimento 60 °C · 5 min", sub:1},
+  {n:100,t:"Stoccaggio cassa", sub:1},
+  {n:110,t:"Fine · composto terminato"},
+];
+const ALARMS = {
+  10:"Timeout riempimento: saracinesca bloccata o sensore di livello guasto",
+  11:"Sensore di livello incoerente: segnala 'pieno' con la tramoggia da riempire",
+  20:"Timeout carico panetti: nastro inceppato o fotocellula guasta",
+  30:"Intervento relè termico del mescolatore",
+  40:"Timeout arrivo cassa: rulliera o casse vuote esaurite",
+  60:"Timeout riscaldamento: resistenza interrotta?",
+  70:"Sonda di temperatura guasta (lettura fuori campo)",
+  80:"Timeout raffreddamento",
+  100:"Timeout stoccaggio: la cassa non arriva in magazzino",
+};
+const IN_MAP = [
+  ["I_START","SB1 START (NA)","%MW0","HR 1024"],
+  ["I_STOP","SB2 STOP (NC)","%MW1","HR 1025"],
+  ["I_EMERG","SB0 EMERGENZA (NC)","%MW2","HR 1026"],
+  ["I_RESET","SB3 RESET (NA)","%MW3","HR 1027"],
+  ["I_SL_MAX","SL livello max","%MW4","HR 1028"],
+  ["I_FC_PAN","FC1 panetto","%MW5","HR 1029"],
+  ["I_FC_CASSA","FC2 cassa in stazione","%MW6","HR 1030"],
+  ["I_FC_MAG","FC3 cassa in magazzino","%MW7","HR 1031"],
+  ["I_FR_MESC","FR termico M1 (NC)","%MW8","HR 1032"],
+  ["I_TT","TT temperatura (0,1 °C)","%MW9","HR 1033"],
+];
+const OUT_MAP = [
+  ["YV_MANDATA","YV1 saracinesca","%QX0.0","coil 0"],
+  ["KM_NASTRO","KM1 nastro M2","%QX0.1","coil 1"],
+  ["KM_MESC","KM2 mescolatore M1","%QX0.2","coil 2"],
+  ["YV_SCARICO","YV2 valvola scarico","%QX0.3","coil 3"],
+  ["KM_RULLIERA","KM3 rulliera M3","%QX0.4","coil 4"],
+  ["HL_GIALLA","H1 gialla","%QX0.5","coil 5"],
+  ["HL_VERDE","H2 verde","%QX0.6","coil 6"],
+  ["HL_ROSSA","H3 rossa","%QX0.7","coil 7"],
+  ["AO_RISC","riscaldatore (mV)","%QW0","HR 0"],
+  ["K_SCALA","scala dei tempi","%QW1","HR 1"],
+  ["FASE","passo sequenza","%QW2","HR 2"],
+  ["N_CASSE","casse stoccate","%QW3","HR 3"],
+  ["COD_ALL","codice allarme","%QW4","HR 4"],
+  ["N_PANETTI","panetti caricati","%QW5","HR 5"],
+];
+const FAULTS = [
+  ["lvlOff","Sensore di livello bloccato su OFF","SL"],
+  ["lvlOn","Sensore di livello bloccato su ON","SL"],
+  ["gate","Saracinesca bloccata chiusa","YV1"],
+  ["jam","Nastro panetti inceppato","M2"],
+  ["peBlind","Fotocellula panetti accecata","FC1"],
+  ["thermal","Intervento relè termico mescolatore","FR"],
+  ["valveShut","Valvola di scarico bloccata chiusa","YV2"],
+  ["valveOpen","Valvola di scarico che perde (aperta)","YV2"],
+  ["noCrates","Casse vuote esaurite","M3"],
+  ["heater","Resistenza riscaldatore interrotta","R"],
+  ["probe","Sonda di temperatura interrotta","TT"],
+  ["lift","Operatore solleva la cassa in stazione","azione",true],
+];
+
+/* =====================================================================
+   UTILITÀ
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); if(parent) parent.appendChild(e); return e; }
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+function mixColor(c1,c2,t){ const p=c=>[1,3,5].map(i=>parseInt(c.substr(i,2),16)); const a=p(c1),b=p(c2); return "#"+a.map((v,i)=>Math.round(lerp(v,b[i],t)).toString(16).padStart(2,"0")).join(""); }
+function fmtProc(s){ s=Math.floor(s); const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60; return [h,m,x].map(v=>String(v).padStart(2,"0")).join(":"); }
+function fmtMin(s){ return (s/60).toFixed(1)+" min"; }
+
+/* =====================================================================
+   PLC DEMO INTERNO — stessa logica di plc/impianto_chimico.st
+   ===================================================================== */
+class TON{ constructor(){this.Q=false;this.ET=0;this.t0=0;this.old=false;}
+  run(IN,PT,now){ if(IN){ if(!this.old) this.t0=now; this.ET=Math.min(now-this.t0,PT); this.Q=this.ET>=PT; } else { this.ET=0; this.Q=false; } this.old=IN; return this; } }
+class RTRIG{ constructor(){this.Q=false;this.M=false;} run(c){ this.Q=c&&!this.M; this.M=c; return this; } }
+class TONRIT{ constructor(){this.tmr=new TON();this.acc=0;this.old=false;this.Q=false;this.ET=0;}
+  run(IN,PT,RST,now){ if(RST){ this.acc=0; this.tmr.run(false,PT,now); this.old=false; }
+    else { if(this.old&&!IN) this.acc+=this.tmr.ET; if(this.acc<PT) this.tmr.run(IN,PT-this.acc,now); else this.tmr.run(false,0,now); this.old=IN; }
+    this.ET=this.acc+this.tmr.ET; this.Q=this.ET>=PT; return this; } }
+class DemoPLC{
+  constructor(){ this.K=30; this.reset(); }
+  reset(){ Object.assign(this,{MARCIA:false,EMERGENZA:false,ALLARME:false,FASE:0,N_CASSE:0,N_PANETTI:0,COD_ALL:0,FASE_OLD:0,
+    ftS:new RTRIG(),ftR:new RTRIG(),ftP:new RTRIG(),ftM:new RTRIG(),tRL:new TON(),
+    trMix:new TONRIT(),trSc:new TONRIT(),tr90:new TONRIT(),tr60:new TONRIT(),wd:new TON(),la:new TON(),lb:new TON()}); }
+  scan(mw,now){
+    const K=Math.max(1,this.K), M=60000;
+    const START=mw[0]!=0,STOP_OK=mw[1]!=0,EMERG_OK=mw[2]!=0,RESET=mw[3]!=0,SL_MAX=mw[4]!=0,FC_PAN=mw[5]!=0,FC_CASSA=mw[6]!=0,FC_MAG=mw[7]!=0,FR_OK=mw[8]!=0;
+    const TEMP=mw[9]/10;
+    this.ftS.run(START); this.ftR.run(RESET); this.ftP.run(FC_PAN); this.ftM.run(FC_MAG);
+    if(!EMERG_OK){ this.EMERGENZA=true; this.MARCIA=false; }
+    if(!FR_OK){ this.ALLARME=true; this.COD_ALL=30; }
+    if(TEMP<-50||TEMP>200){ this.ALLARME=true; this.COD_ALL=70; }
+    if(this.ftR.Q&&EMERG_OK){ this.EMERGENZA=false; this.ALLARME=false; this.COD_ALL=0; }
+    if(!STOP_OK) this.MARCIA=false;
+    if(this.ftS.Q&&STOP_OK&&!this.EMERGENZA&&!this.ALLARME){
+      if(this.FASE==0||this.FASE==110){ if(SL_MAX){this.ALLARME=true;this.COD_ALL=11;} else {this.FASE=10;this.N_CASSE=0;this.N_PANETTI=0;this.MARCIA=true;} }
+      else this.MARCIA=true;
+    }
+    this.tRL.run(RESET&&!this.MARCIA,3000,now);
+    if(this.tRL.Q){ this.FASE=0; this.N_CASSE=0; this.N_PANETTI=0; }
+    if(this.EMERGENZA||this.ALLARME) this.MARCIA=false;
+    let ATT=this.MARCIA;
+    const F=this.FASE;
+    this.trMix.run(ATT&&F==30, 5*M/K, F!=30, now);
+    this.trSc.run(ATT&&F==50&&FC_CASSA, 4*M/K, F!=50, now);
+    this.tr90.run(ATT&&F==70&&TEMP>=88, 20*M/K, F!=70, now);
+    this.tr60.run(ATT&&F==90&&TEMP>=58&&TEMP<=62, 5*M/K, F!=90, now);
+    if(ATT){
+      switch(this.FASE){
+        case 10: if(SL_MAX) this.FASE=20; break;
+        case 20: if(this.ftP.Q) this.N_PANETTI++; if(this.N_PANETTI>=5) this.FASE=30; break;
+        case 30: if(this.trMix.Q) this.FASE=40; break;
+        case 40: if(FC_CASSA) this.FASE=50; break;
+        case 50: if(this.trSc.Q) this.FASE=60; break;
+        case 60: if(TEMP>=90) this.FASE=70; break;
+        case 70: if(this.tr90.Q) this.FASE=80; break;
+        case 80: if(TEMP<=60) this.FASE=90; break;
+        case 90: if(this.tr60.Q) this.FASE=100; break;
+        case 100: if(this.ftM.Q){ this.N_CASSE++; if(this.N_CASSE>=4){this.FASE=110;this.MARCIA=false;ATT=false;} else this.FASE=40; } break;
+      }
+    }
+    let WDPT=0;
+    switch(this.FASE){ case 10:WDPT=5*M/K;break; case 20:WDPT=30000;break; case 40:WDPT=20000;break; case 60:WDPT=10*M/K;break; case 80:WDPT=6*M/K;break; case 100:WDPT=20000;break; }
+    this.wd.run(ATT&&WDPT>0&&this.FASE==this.FASE_OLD,WDPT,now);
+    if(this.wd.Q){ this.ALLARME=true; this.COD_ALL=this.FASE; this.MARCIA=false; ATT=false; }
+    this.FASE_OLD=this.FASE;
+    const Fn=this.FASE;
+    const qx=[ATT&&Fn==10, ATT&&Fn==20, ATT&&Fn==30&&FR_OK, ATT&&Fn==50&&FC_CASSA, ATT&&((Fn==40&&!FC_CASSA)||Fn==100)];
+    let V=0; if(ATT){ if(Fn==60)V=10; else if(Fn==70)V=TEMP<89?10:90/12; else if(Fn==90)V=TEMP<59?10:60/12; }
+    this.la.run(!this.lb.Q,500,now); this.lb.run(this.la.Q,500,now);
+    const LAMP=this.la.Q;
+    qx.push(this.MARCIA&&!this.EMERGENZA&&!this.ALLARME, !this.MARCIA&&!this.EMERGENZA&&!this.ALLARME, this.EMERGENZA||(this.ALLARME&&LAMP));
+    return {qx:qx.map(b=>b?1:0), qw:[Math.round(V*1000),K,this.FASE,this.N_CASSE,this.COD_ALL,this.N_PANETTI]};
+  }
+}
+const demo = new DemoPLC();
+
+/* =====================================================================
+   STATO DELL'IMPIANTO SIMULATO
+   ===================================================================== */
+const crateEls=new Map();
+let P, OUT={qx:[0,0,0,0,0,0,0,0], qw:[0,30,0,0,0,0]};
+const F = {}; FAULTS.forEach(f=>F[f[0]]=false);
+const OP = {start:false, stop:false, reset:false, mush:false};
+const hold = {start:0, stop:0, reset:0};
+let crateId=0;
+function newCrate(x){ return {id:++crateId, x, vol:0, mixSum:0, T:T_AMB, t90:0, t60:0, maxT:T_AMB, hot:false, bricks:null, lifted:false}; }
+function resetPlant(){
+  P = { vol:0, bricks:0, mix:0, beltPos:0, beltBricks:[], falling:[], crates:[newCrate(50), newCrate(50-SPACING)],
+        stored:[], lifting:[], spillFloor:0, spillTank:0, rollerA:0, mixA:0, mixW:0, fanA:0, proc:0, trend:[], lastTrend:-1,
+        peHold:0, magHold:0, magSeen:null, bubbles:[], steam:[], splash:[] };
+  for(let x=BELT_END+40; x<900; x+=BRICK_GAP) P.beltBricks.push({x});
+  for(const [,e] of crateEls) e.g.remove(); crateEls.clear();
+  qcRender(); buildStoredView();
+}
+resetPlant();
+
+/* =====================================================================
+   INGRESSI DAL CAMPO (calcolati dal modello) → parola %MW
+   ===================================================================== */
+function stationCrate(){ return P.crates.find(c=>!c.lifted && c.x-CRATE_W/2<=FC2_X && c.x+CRATE_W/2>=FC2_X); }
+function crateUnderNozzle(){ return P.crates.find(c=>!c.lifted && Math.abs(c.x-STATION)<CRATE_W/2-6); }
+function inputs(){
+  const now=performance.now();
+  const sl = F.lvlOn ? 1 : F.lvlOff ? 0 : (P.vol>=V_SENSOR?1:0);
+  const sc = stationCrate();
+  let T = sc ? sc.T : T_AMB;
+  let tt = F.probe ? -999 : Math.round(T*10);
+  return [
+    (OP.start||now<hold.start)?1:0,
+    (OP.stop||now<hold.stop)?0:1,
+    OP.mush?0:1,
+    (OP.reset||now<hold.reset)?1:0,
+    sl,
+    (!F.peBlind && now<P.peHold)?1:0,
+    sc?1:0,
+    (now<P.magHold)?1:0,
+    F.thermal?0:1,
+    tt
+  ];
+}
+
+/* =====================================================================
+   PASSO DEL MODELLO FISICO
+   ===================================================================== */
+function step(dt){ // dt in s reali
+  const now=performance.now();
+  const q=OUT.qx, K=Math.max(1,OUT.qw[1]||1), dtp=dt*K;
+  P.proc+=dtp;
+  // --- riempimento
+  if(q[0] && !F.gate){ P.vol+=Q_IN/60*dtp; }
+  if(P.vol>V_RIM){ P.spillTank+=P.vol-V_RIM; P.vol=V_RIM; }
+  // --- nastro panetti
+  const beltOn = q[1] && !F.jam;
+  if(beltOn){
+    const dx=BELT_SPEED*dt; P.beltPos=(P.beltPos+dx)%24;
+    P.beltBricks.forEach(b=>b.x-=dx);
+    const last=P.beltBricks[P.beltBricks.length-1];
+    if(!last || last.x<930-BRICK_GAP) P.beltBricks.push({x:(last?last.x:900)+BRICK_GAP});
+    while(P.beltBricks.length && P.beltBricks[0].x<BELT_END){ const b=P.beltBricks.shift(); P.falling.push({x:b.x-8,y:84,vy:20,rot:0}); }
+  }
+  const surfY = levelY(P.vol);
+  P.falling.forEach(b=>{ b.vy+=900*dt; b.y+=b.vy*dt; b.x-=18*dt; b.rot+=90*dt;
+    if(b.y+14>BEAM_Y-1 && b.y<BEAM_Y+1) P.peHold=Math.max(P.peHold, now+PULSE_MIN);
+    if(b.y>Math.min(surfY,425)-8){ b.done=true; P.bricks++; for(let i=0;i<9;i++) P.splash.push({x:b.x+8,y:Math.min(surfY,425),vx:(Math.random()-.5)*160,vy:-120-Math.random()*120,life:.6}); } });
+  P.falling=P.falling.filter(b=>!b.done);
+  // --- mescolatore
+  const mixOn = q[2] && !F.thermal;
+  P.mixW = lerp(P.mixW, mixOn?1:0, clamp(dt*2,0,1));
+  P.mixA += P.mixW*dt*9; P.fanA += P.mixW*dt*18;
+  if(mixOn && P.vol>5 && P.bricks>0) P.mix=clamp(P.mix+dtp/MIX_TIME,0,1);
+  // --- scarico
+  const valveOpen = (q[3] && !F.valveShut) || F.valveOpen;
+  P.flowing=false;
+  if(valveOpen && P.vol>0.001){
+    const f=Math.min(P.vol, Q_OUT/60*dtp); P.vol-=f; P.flowing=true;
+    const c=crateUnderNozzle();
+    if(c){ c.vol+=f; c.mixSum+=f*mixQuality(); c.bricks=P.bricks; } else P.spillFloor+=f;
+  }
+  // --- rulliera
+  const convOn = !!q[4];
+  if(convOn){
+    const dx=CONV_SPEED*dt; P.rollerA+=dx/9;
+    P.crates.forEach(c=>{ if(!c.lifted) c.x+=dx; });
+    if(!F.noCrates){
+      if(!P.crates.length) P.crates.push(newCrate(50-SPACING));
+      const minX=Math.min(...P.crates.map(c=>c.x));
+      if(minX>50) P.crates.push(newCrate(minX-SPACING));
+    }
+  }
+  // sensore magazzino: la cassa che copre FC3 per almeno PULSE_MIN viene presa dal traslo
+  const cm=P.crates.find(c=>c.x+CRATE_W/2>=FC3_X && c.x-CRATE_W/2<=FC3_X);
+  if(cm){ if(P.magSeen!==cm.id){ P.magSeen=cm.id; cm.seenAt=now; } P.magHold=Math.max(P.magHold, now+60);
+    if(now-cm.seenAt>PULSE_MIN+150){ P.crates=P.crates.filter(c=>c!==cm); P.lifting.push({c:cm,t:0,x0:cm.x,slot:P.stored.length+P.lifting.length}); } }
+  P.lifting.forEach(l=>{ l.t+=dt/1.3; if(l.t>=1){ l.done=true; P.stored.push(l.c); qcRender(); log(`Cassa ${P.stored.length} stoccata: ${qcVerdict(l.c).ok?"CONFORME":"NON conforme"}`, qcVerdict(l.c).ok?"g":"e"); buildStoredView(); } });
+  P.lifting=P.lifting.filter(l=>!l.done);
+  // --- termica casse
+  const V = F.heater?0:clamp((OUT.qw[0]||0)/1000,0,10);
+  const sc=stationCrate();
+  P.crates.concat(P.lifting.map(l=>l.c)).forEach(c=>{
+    const tgt = (c===sc) ? Math.max(T_AMB,12*V) : T_AMB;
+    c.T += (tgt-c.T)*(1-Math.exp(-dtp/TAU));
+    c.maxT=Math.max(c.maxT,c.T);
+    if(c.T>=87 && c.T<=95){ c.t90+=dtp; c.hot=true; }
+    if(c.hot && c.T>=57 && c.T<=63) c.t60+=dtp;
+  });
+  // --- trend
+  const tNow=P.proc;
+  if(tNow-P.lastTrend >= Math.max(1, 2*K/30)){ P.lastTrend=tNow; P.trend.push({t:tNow, T:sc?sc.T:null, V}); if(P.trend.length>2400) P.trend.shift(); }
+  // --- particelle
+  P.splash.forEach(s=>{ s.vy+=600*dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=dt; }); P.splash=P.splash.filter(s=>s.life>0);
+  if(P.mixW>0.3 && Math.random()<P.mixW*dt*20 && P.vol>5) P.bubbles.push({x:380+Math.random()*190,y:levelY(0)-10,vy:-30-Math.random()*40,r:2+Math.random()*3});
+  P.bubbles.forEach(b=>{ b.y+=b.vy*dt; }); P.bubbles=P.bubbles.filter(b=>b.y>levelY(P.vol));
+  P.crates.forEach(c=>{ if(c.T>55 && Math.random()<dt*(c.T-50)/8) P.steam.push({x:c.x-25+Math.random()*50,y:520,life:1.6,vx:(Math.random()-.5)*10}); });
+  P.steam.forEach(s=>{ s.y-=28*dt; s.x+=s.vx*dt; s.life-=dt; }); P.steam=P.steam.filter(s=>s.life>0);
+  plantWarnings();
+}
+function mixQuality(){ return (P.bricks===5) ? P.mix : P.mix*0.5; }
+function levelY(v){ return v<=10 ? 440-60*(v/10) : 380-(v-10)*(220/70); }
+
+/* =====================================================================
+   CONTROLLO QUALITÀ
+   ===================================================================== */
+function qcVerdict(c){
+  const why=[]; const mix=c.vol>0? c.mixSum/c.vol : 0;
+  if(c.vol<19||c.vol>21) why.push(`volume ${c.vol.toFixed(1)} L`);
+  if(c.bricks!==5 && c.vol>0) why.push(`dosaggio: ${c.bricks} panetti`);
+  if(mix<0.95 && c.vol>0) why.push(`miscelazione ${Math.round(mix*100)} %`);
+  if(c.t90<19.5*60) why.push(`a 90 °C solo ${fmtMin(c.t90)}`);
+  if(c.t60<4.8*60) why.push(`a 60 °C solo ${fmtMin(c.t60)}`);
+  if(c.maxT>100) why.push(`surriscaldata (${c.maxT.toFixed(0)} °C)`);
+  return {ok:why.length===0, why, mix};
+}
+function qcRender(){
+  const tb=$("qcTab").tBodies[0]; tb.innerHTML=""; const whys=[];
+  const all = P ? P.stored : [];
+  for(let i=0;i<Math.max(4,all.length);i++){
+    const c=all[i]; const tr=document.createElement("tr");
+    if(!c){ tr.innerHTML=`<td>#${i+1}</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">in attesa</td>`; }
+    else { const v=qcVerdict(c);
+      const mk=(ok,t)=>`<td class="${ok?'ok':'ko'}">${t}</td>`;
+      tr.innerHTML=`<td>#${i+1}</td>`+mk(c.vol>=19&&c.vol<=21,c.vol.toFixed(1))+mk(v.mix>=.95&&c.bricks===5,Math.round(v.mix*100)+"%")+mk(c.t90>=1170&&c.maxT<=100,(c.t90/60).toFixed(1)+"′")+mk(c.t60>=288,(c.t60/60).toFixed(1)+"′")+`<td class="${v.ok?'ok':'ko'}">${v.ok?'✓ OK':'✗ KO'}</td>`;
+      if(!v.ok) whys.push(`#${i+1}: ${v.why.join(", ")}`); }
+    tb.appendChild(tr);
+  }
+  $("qcWhy").textContent=whys.join(" · ");
+}
+
+/* =====================================================================
+   AVVISI DI IMPIANTO (osservati sul campo, indipendenti dal PLC)
+   ===================================================================== */
+let warnState={};
+function plantWarnings(){
+  const w=[];
+  if(P.spillTank>0.05) w.push(["red",`TRABOCCO tramoggia: ${P.spillTank.toFixed(1)} L persi`]);
+  if(P.spillFloor>0.05) w.push(["red",`SVERSAMENTO sotto la valvola: ${P.spillFloor.toFixed(1)} L a terra`]);
+  if(P.bricks>5) w.push(["amb",`Dosaggio errato: ${P.bricks} panetti in tramoggia`]);
+  const sc=stationCrate(); if(sc && sc.maxT>100) w.push(["red",`Cassa surriscaldata: ${sc.maxT.toFixed(0)} °C`]);
+  if(F.lift && OUT.qx[3]) w.push(["amb","Valvola aperta senza cassa sotto!"]);
+  const key=w.map(x=>x[1].split(":")[0]).join("|");
+  w.forEach(x=>{ const k=x[1].split(":")[0]; if(!warnState[k]){ warnState[k]=1; log(x[1], x[0]==="red"?"e":"w"); } });
+  Object.keys(warnState).forEach(k=>{ if(!key.split("|").includes(k)) delete warnState[k]; });
+  P.warn=w;
+}
+
+/* =====================================================================
+   SCAMBIO CON IL PLC
+   ===================================================================== */
+let mode="demo", ws=null, wsState="off", lastOutAt=0, plcLink=false;
+function setMode(m){
+  mode=m; document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.m===m));
+  $("wsbox").style.display = m==="plc" ? "flex" : "none";
+  document.querySelectorAll("#ksel button").forEach(b=>b.disabled = m!=="demo");
+  $("ksel").style.display = m==="demo" ? "flex" : "none";
+  if(m==="demo"){ if(ws){ ws.close(); ws=null; } demo.reset(); log("Controllo affidato al PLC demo interno","s"); }
+  else { OUT={qx:[0,0,0,0,0,0,0,0],qw:[0,OUT.qw[1],0,0,0,0]}; connectWS(); }
+  updateLink();
+}
+function connectWS(){
+  if(ws){ try{ws.close();}catch(e){} }
+  const url=$("wsurl").value.trim(); wsState="wait"; updateLink();
+  try{ ws=new WebSocket(url); }catch(e){ wsState="bad"; updateLink(); return; }
+  ws.onopen=()=>{ wsState="ok"; updateLink(); log("Collegato al bridge "+url,"s"); };
+  ws.onclose=()=>{ wsState="bad"; plcLink=false; updateLink(); OUT={qx:[0,0,0,0,0,0,0,0],qw:[0,OUT.qw[1],0,0,0,0]}; if(mode==="plc") setTimeout(()=>{ if(mode==="plc" && (!ws||ws.readyState>1)) connectWS(); },2000); };
+  ws.onerror=()=>{ wsState="bad"; updateLink(); };
+  ws.onmessage=ev=>{ let m; try{ m=JSON.parse(ev.data);}catch(e){return;}
+    if(m.t==="out"){ if(m.plc){ OUT={qx:m.qx.map(Number),qw:m.qw.map(Number)}; lastOutAt=performance.now(); } else { OUT={qx:[0,0,0,0,0,0,0,0],qw:[0,OUT.qw[1],0,0,0,0]}; } if(plcLink!==!!m.plc){ plcLink=!!m.plc; log(plcLink?"OpenPLC raggiungibile via Modbus TCP":"OpenPLC non raggiungibile: uscite forzate a 0", plcLink?"g":"e"); } updateLink(); } };
+}
+function updateLink(){
+  const d=$("linkDot"), t=$("linkTxt");
+  if(mode==="demo"){ d.className="dot ok"; t.textContent="PLC demo attivo"; return; }
+  if(wsState==="ok" && plcLink){ d.className="dot ok"; t.textContent="OpenPLC in linea"; }
+  else if(wsState==="ok"){ d.className="dot wait"; t.textContent="bridge ok · PLC assente"; }
+  else if(wsState==="wait"){ d.className="dot wait"; t.textContent="connessione…"; }
+  else { d.className="dot bad"; t.textContent="bridge non raggiungibile"; }
+}
+let lastSend=0;
+function exchange(){
+  const now=performance.now(), mw=inputs();
+  if(mode==="demo"){ OUT=demo.scan(mw, now); }
+  else if(ws && ws.readyState===1 && now-lastSend>=40){ ws.send(JSON.stringify({t:"in", mw})); lastSend=now; }
+  return mw;
+}
+
+/* =====================================================================
+   REGISTRO EVENTI
+   ===================================================================== */
+let logN=0;
+function log(msg, cls="i"){
+  const d=document.createElement("div"); d.innerHTML=`<span>${fmtProc(P?P.proc:0)}</span><b class="${cls}" style="font-weight:500"></b>`; d.querySelector("b").textContent=msg;
+  const L=$("log"); L.prepend(d); while(L.children.length>300) L.lastChild.remove();
+  $("logCount").textContent=(++logN)+" eventi";
+}
+let prevIn=null, prevOut=null, prevPhase=-1, prevAlarm=0;
+function logChanges(mw){
+  if(prevIn){ IN_MAP.forEach((m,i)=>{ if(i===9) return; if(i===5) return; if(mw[i]!==prevIn[i]) log(`${m[1]} → ${mw[i]}`,"i"); }); }
+  if(prevOut){ OUT_MAP.slice(0,5).forEach((m,i)=>{ if(OUT.qx[i]!==prevOut.qx[i]) log(`${m[1]} → ${OUT.qx[i]?"ON":"OFF"}`,"o"); });
+    if(OUT.qw[0]!==prevOut.qw[0]) log(`Riscaldatore → ${(OUT.qw[0]/1000).toFixed(2)} V`,"o"); }
+  const ph=OUT.qw[2]; if(ph!==prevPhase){ const p=PHASES.find(x=>x.n===ph); log(`FASE ${ph}: ${p?p.t:"?"}`,"s"); prevPhase=ph; phaseEnter(ph); }
+  const a=OUT.qw[4]; if(a!==prevAlarm){ if(a) log(`ALLARME ${a}: ${ALARMS[a]||"codice sconosciuto"}`,"e"); prevAlarm=a; }
+  prevIn=mw.slice(); prevOut={qx:OUT.qx.slice(),qw:OUT.qw.slice()};
+}
+
+/* =====================================================================
+   COSTRUZIONE UI
+   ===================================================================== */
+(function buildUI(){
+  // sequenza
+  const ul=$("steps");
+  PHASES.forEach(p=>{ const li=document.createElement("li"); li.id="ph"+p.n; if(p.sub) li.classList.add("sub");
+    li.innerHTML=`<span class="n">${p.n}</span><span>${p.t}</span><span class="v"></span><div class="bar"><i></i></div>`; ul.appendChild(li); });
+  // I/O
+  const ti=$("tIn"), to=$("tOut");
+  IN_MAP.forEach((m,i)=>{ const tr=document.createElement("tr"); tr.innerHTML=`<td>${m[1]}</td><td class="m">${m[2]}</td><td class="val" id="vi${i}"></td>`; ti.appendChild(tr); });
+  OUT_MAP.forEach((m,i)=>{ const tr=document.createElement("tr"); tr.innerHTML=`<td>${m[1]}</td><td class="m">${m[2]}</td><td class="val" id="vo${i}"></td>`; to.appendChild(tr); });
+  // guasti
+  const fd=$("faults");
+  FAULTS.forEach(f=>{ const d=document.createElement("div"); d.className="flt"+(f[3]?" act":""); d.innerHTML=`<span class="sw"></span><span>${f[1]}</span><span class="tag">${f[2]}</span>`;
+    d.onclick=()=>{ F[f[0]]=!F[f[0]]; d.classList.toggle("on",F[f[0]]); log((F[f[0]]?"GUASTO: ":"Riparato: ")+f[1], F[f[0]]?"w":"g"); if(f[0]==="lift") liftCrate(F.lift); if(f[0]==="noCrates" && F.noCrates) P.crates=P.crates.filter(c=>c.x>STATION-CRATE_W); };
+    d.id="f_"+f[0]; fd.appendChild(d); });
+  $("clearF").onclick=()=>{ FAULTS.forEach(f=>{ if(F[f[0]]){ F[f[0]]=false; $("f_"+f[0]).classList.remove("on"); if(f[0]==="lift") liftCrate(false);} }); log("Tutti i guasti riparati","g"); };
+  $("resetPlant").onclick=()=>{ resetPlant(); demo.reset(); prevPhase=-1; log("Nuovo impianto: tramoggia vuota, magazzino vuoto","s"); };
+  // pulsanti
+  const mom=(id,key)=>{ const b=$(id);
+    const dn=e=>{ e.preventDefault(); OP[key]=true; b.classList.add("down"); hold[key]=performance.now()+150; };
+    const up=()=>{ if(OP[key]){ OP[key]=false; b.classList.remove("down"); } };
+    b.addEventListener("pointerdown",dn); b.addEventListener("pointerup",up); b.addEventListener("pointerleave",up); b.addEventListener("pointercancel",up); };
+  mom("bStart","start"); mom("bStop","stop"); mom("bReset","reset");
+  $("mush").onclick=()=>{ OP.mush=!OP.mush; $("mush").classList.toggle("down",OP.mush);
+    $("mushTxt").innerHTML = OP.mush ? "<b style='color:#ff8d98'>Fungo PREMUTO e bloccato.</b><br>Contatto NC aperto. Clic per ruotare e sbloccare, poi RESET." : "<b>Fungo rilasciato.</b><br>Contatto NC chiuso. Clic per premere: resta bloccato finché non lo sblocchi.";
+    log(OP.mush?"Fungo di emergenza PREMUTO":"Fungo di emergenza sbloccato", OP.mush?"e":"i"); };
+  // modalità
+  document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+  $("wsurl").value = (location.protocol.startsWith("http") ? `ws://${location.host}/ws` : "ws://localhost:8080/ws");
+  $("wsconn").onclick=connectWS;
+  document.querySelectorAll("#ksel button").forEach(b=>b.onclick=()=>{ demo.K=+b.dataset.k; log(`Scala dei tempi ×${demo.K} (K_SCALA)`,"s"); });
+  // rulli
+  const rg=$("rollers"); for(let x=30;x<=910;x+=30){ if(x>415&&x<525) continue; const g=el("g",{transform:`translate(${x} 585)`},rg); el("circle",{r:7,fill:"#2f3b55",stroke:"#56698f"},g); el("line",{x1:-6,y1:0,x2:6,y2:0,stroke:"#8aa0c8","stroke-width":1.5,class:"rl"},g); }
+  const br=$("beltRollers"); [574,916].forEach(x=>{ const g=el("g",{transform:`translate(${x} 100)`},br); el("circle",{r:7,fill:"#2f3b55",stroke:"#56698f"},g); el("line",{x1:-6,y1:0,x2:6,y2:0,stroke:"#8aa0c8","stroke-width":1.5,class:"brl"},g); });
+  // pallini panetti
+  for(let i=0;i<5;i++){ el("rect",{x:i*34,y:0,width:26,height:12,rx:2,fill:"#1d2638",stroke:"#2f3b55",id:"bd"+i},$("brickDots")); }
+  log("SCADA pronto. Premi START sul pannello operatore.","s");
+  updateLink();
+})();
+function liftCrate(on){
+  if(on){ const c=stationCrate()||crateUnderNozzle(); if(c){ c.lifted=true; c.liftX=c.x; } else log("Nessuna cassa in stazione da sollevare","w"); }
+  else P.crates.forEach(c=>c.lifted=false);
+}
+
+/* =====================================================================
+   DISEGNO
+   ===================================================================== */
+let phaseT0=0, phaseAcc=0;
+function phaseEnter(){ phaseAcc=0; }
+function phaseCounts(){ const ph=OUT.qw[2], c=stationCrate(), T=c?c.T:T_AMB;
+  if(ph===70) return T>=88; if(ph===90) return T>=58&&T<=62; return true; }
+function crateSVG(c){
+  const g=el("g",{},$("crates"));
+  el("rect",{x:-40,y:-58,width:80,height:58,rx:4,fill:"#2a2015",stroke:"#8a6a3c","stroke-width":2},g);
+  const liq=el("rect",{x:-36,y:-4,width:72,height:0,fill:"#ffb547"},g);
+  el("path",{d:"M-40 -40 H40 M-40 -20 H40",stroke:"#8a6a3c","stroke-width":1,opacity:.5},g);
+  const glow=el("rect",{x:-40,y:-58,width:80,height:58,rx:4,fill:"#ff4d1f",opacity:0},g);
+  const lbl=el("text",{x:0,y:-64,"font-size":10,"text-anchor":"middle",fill:"#9fb3d9","font-family":"monospace"},g);
+  return {g,liq,glow,lbl};
+}
+function drawCrate(c, x, y, e){
+  e.g.setAttribute("transform",`translate(${x} ${y})`);
+  const h=clamp(c.vol/22,0,1)*52; e.liq.setAttribute("y",-4-h); e.liq.setAttribute("height",h);
+  const hot=clamp((c.T-25)/75,0,1);
+  e.liq.setAttribute("fill", mixColor("#ffb547","#ff5a2a",hot));
+  e.glow.setAttribute("opacity",(hot*0.28).toFixed(2));
+  e.lbl.textContent = c.vol>0.2 ? `${c.vol.toFixed(1)} L` : "";
+}
+function buildStoredView(){
+  const g=$("stored"); g.innerHTML="";
+  P.stored.forEach((c,i)=>{ const s=slotPos(i); const e=crateSVG(c); g.appendChild(e.g); drawCrate(c,s.x,s.y,e);
+    const v=qcVerdict(c); const b=el("g",{transform:`translate(${s.x+30} ${s.y-50})`},g); el("circle",{r:11,fill:v.ok?"#3ee08a":"#ff4d5e"},b); el("text",{y:4,"text-anchor":"middle","font-size":13,"font-weight":800,fill:"#06101f"},b).textContent=v.ok?"✓":"✗"; });
+  if(P.stored.length>4){ el("text",{x:1030,y:530,"text-anchor":"middle",fill:"#ff8d98","font-size":12,"font-weight":700},g).textContent=`+${P.stored.length-4} casse oltre la capienza del lotto!`; }
+}
+function slotPos(i){ const k=i%4; return {x: k%2===0?968:1096, y: k<2?414:504}; }
+
+let lastFrame=performance.now(), acc=0;
+function frame(){
+  const now=performance.now(); let dt=(now-lastFrame)/1000; lastFrame=now; dt=Math.min(dt,0.1);
+  acc+=dt;
+  let mw=null;
+  while(acc>=0.02){ mw=exchange(); step(0.02); acc-=0.02; if(OUT.qx[5] && phaseCounts()) phaseAcc+=0.02*Math.max(1,OUT.qw[1]); }
+  if(mw) logChanges(mw);
+  draw(mw||inputs());
+  requestAnimationFrame(frame);
+}
+function draw(mw){
+  const q=OUT.qx, K=Math.max(1,OUT.qw[1]||1);
+  // header
+  $("kTxt").textContent="×"+K; $("ptime").textContent=fmtProc(P.proc);
+  document.querySelectorAll("#ksel button").forEach(b=>b.classList.toggle("on", +b.dataset.k===K));
+  // liquido
+  const y=levelY(P.vol), t=performance.now()/1000, amp=1.5+P.mixW*5;
+  let d=`M350 ${y}`; for(let x=350;x<=590;x+=10) d+=` L${x} ${y+Math.sin(x/22+t*(2+P.mixW*6))*amp}`; d+=" L590 460 L350 460 Z";
+  $("liquid").setAttribute("d", P.vol>0.05?d:"");
+  const mq=mixQuality();
+  $("liqTop").setAttribute("stop-color", mixColor("#5cc2ff","#ffc861",mq)); $("liqBot").setAttribute("stop-color", mixColor("#1b5fb0","#d9822b",mq));
+  $("volTxt").textContent=P.vol.toFixed(1)+" L";
+  // panetti in tramoggia
+  const tb=$("tankBricks"); tb.innerHTML="";
+  for(let i=0;i<Math.min(P.bricks,10);i++){ const bx=420+(i%5)*22+Math.sin(P.mixA+i)*P.mixW*8, by=418-Math.floor(i/5)*12;
+    el("rect",{x:bx,y:by,width:18,height:10,rx:2,fill:"url(#pBrick)",opacity:(1-P.mix*0.95).toFixed(2),transform:`rotate(${(P.mixA*40*P.mixW+i*17)%360} ${bx+9} ${by+5})`},tb); }
+  const bb=$("bubbles"); bb.innerHTML=""; P.bubbles.forEach(b=>el("circle",{cx:b.x,cy:b.y,r:b.r,fill:"none",stroke:"#ffffff66"},bb));
+  // mescolatore
+  [[ "blade1",398],[ "blade2",310]].forEach(([id,by],i)=>{ const w=46*Math.cos(P.mixA+i*0.8); $(id).setAttribute("d",`M470 ${by-7} L${470+w} ${by-4} L${470+w} ${by+4} L470 ${by+7} L${470-w} ${by+4} L${470-w} ${by-4} Z`); });
+  $("fan").setAttribute("transform",`translate(470 72) rotate(${P.fanA*57.3})`);
+  $("frLed").setAttribute("fill", F.thermal?"#ff4d5e":"#3ee08a");
+  // saracinesca
+  const gateOpen=q[0]&&!F.gate;
+  $("gatePlate").setAttribute("y", q[0]? (F.gate?-10:-30) : -10);
+  $("gateBody").setAttribute("fill", q[0]?(F.gate?"#5a2a33":"#1f6b45"):"#30405f");
+  const fi=$("flowIn"); fi.setAttribute("opacity",gateOpen?.95:0); fi.setAttribute("stroke-dashoffset",-t*60);
+  // sensore livello
+  $("lshLed").setAttribute("fill", mw[4]?"#3ee08a":"#1d2638"); $("lshLed").setAttribute("filter", mw[4]?"url(#glow)":"");
+  // nastro
+  let m=""; for(let x=566-P.beltPos+24; x<926; x+=24) m+=`M${x} 95 v10 `; $("beltMarks").setAttribute("d",m);
+  document.querySelectorAll(".brl").forEach(l=>l.setAttribute("transform",`rotate(${-P.beltPos*15})`));
+  const bg=$("bricks"); bg.innerHTML=""; P.beltBricks.forEach(b=>{ if(b.x<930) el("rect",{x:b.x,y:76,width:30,height:16,rx:2,fill:"url(#pBrick)",stroke:"#6e3c1a"},bg); });
+  const fg=$("falling"); fg.innerHTML=""; P.falling.forEach(b=>el("rect",{x:b.x,y:b.y,width:30,height:16,rx:2,fill:"url(#pBrick)",stroke:"#6e3c1a",transform:`rotate(${b.rot} ${b.x+15} ${b.y+8})`},fg));
+  P.splash.forEach(s=>el("circle",{cx:s.x,cy:s.y,r:2.5,fill:"#9fd8ff",opacity:s.life*1.5},fg));
+  const pe=mw[5]; $("peBeam").setAttribute("stroke",pe?"#ffd23f":"#ff4d5e"); $("peBeam").setAttribute("opacity",F.peBlind?.15:(pe?1:.6)); $("peBeam").setAttribute("filter",pe?"url(#glow)":"");
+  // panetti contati (dal PLC se disponibile, altrimenti in vasca)
+  for(let i=0;i<5;i++) $("bd"+i).setAttribute("fill", i<P.bricks ? "#c47a40" : "#1d2638");
+  // scarico
+  const vOpen=(q[3]&&!F.valveShut)||F.valveOpen;
+  $("drainValve").setAttribute("fill", vOpen?"#1f6b45":(q[3]?"#5a2a33":"#30405f"));
+  const cu=crateUnderNozzle(); const yEnd = cu ? 576-clamp(cu.vol/22,0,1)*52 : 612;
+  $("stream").setAttribute("d", `M470 504 Q${470+Math.sin(t*20)} ${(504+yEnd)/2} 470 ${yEnd}`);
+  $("stream").setAttribute("opacity", P.flowing?.95:0); $("stream").setAttribute("stroke", mixColor("#5cc2ff","#ffb547",mq));
+  $("puddle").setAttribute("rx", Math.min(120, Math.sqrt(P.spillFloor)*22)); $("puddle").setAttribute("ry", Math.min(8, Math.sqrt(P.spillFloor)*2));
+  const casc=$("cascade"); const spilling = P.vol>=V_RIM-0.01 && gateOpen; casc.setAttribute("opacity", spilling?.85:0); casc.setAttribute("stroke-dashoffset", -t*80); casc.setAttribute("stroke", mixColor("#5cc2ff","#ffc861",mq));
+  $("puddle2").setAttribute("rx", Math.min(160, Math.sqrt(P.spillTank)*22)); $("puddle2").setAttribute("ry", Math.min(9, Math.sqrt(P.spillTank)*2));
+  // rulliera
+  document.querySelectorAll(".rl").forEach(l=>l.setAttribute("transform",`rotate(${P.rollerA*57.3})`));
+  const live=new Set();
+  P.crates.concat(P.lifting.map(l=>l.c)).forEach(c=>{ live.add(c.id); if(!crateEls.has(c.id)) crateEls.set(c.id, crateSVG(c)); });
+  for(const [id,e] of crateEls){ if(!live.has(id)){ e.g.remove(); crateEls.delete(id); } }
+  P.crates.forEach(c=>{ const e=crateEls.get(c.id); drawCrate(c, c.x, c.lifted?512:580, e); e.g.setAttribute("opacity", c.lifted?.75:1); });
+  P.lifting.forEach(l=>{ const s=slotPos(l.slot), k=l.t, e=crateEls.get(l.c.id);
+    const x= k<.4 ? lerp(l.x0, s.x, k/.4) : s.x, yy= k<.4 ? 580 : lerp(580, s.y, (k-.4)/.6); drawCrate(l.c,x,yy,e); });
+  $("fcCassaBeam").setAttribute("opacity", mw[6]?1:.25); $("fcCassaBeam").setAttribute("filter", mw[6]?"url(#glow)":"");
+  $("fcMagBeam").setAttribute("opacity", mw[7]?1:.25); $("fcMagBeam").setAttribute("filter", mw[7]?"url(#glow)":"");
+  const sc=stationCrate(), probeDown = sc && !q[4];
+  $("probeRod").setAttribute("y2", probeDown?545:500);
+  // riscaldatore
+  const V=F.heater?0:clamp(OUT.qw[0]/1000,0,10);
+  $("heatPlate").setAttribute("opacity", (V/10).toFixed(2)); $("heatGlow").setAttribute("opacity", (V/10*0.9).toFixed(2));
+  $("voltTxt").textContent=(OUT.qw[0]/1000).toFixed(2)+" V";
+  const Tdisp = mw[9]/10; $("tempTxt").textContent = F.probe ? "---- °C" : Tdisp.toFixed(1)+"°C";
+  $("tempTxt").setAttribute("fill", Tdisp>=87?"#ff8a3d":Tdisp>=55?"#ffb547":"#dbe6ff");
+  const st=$("steam"); st.innerHTML=""; P.steam.forEach(s=>el("circle",{cx:s.x,cy:s.y,r:4+(1.6-s.life)*5,fill:"#dbe6ff",opacity:(s.life/1.6*0.25).toFixed(2)},st));
+  $("storeTxt").textContent=`${P.stored.length} / 4`;
+  // fase
+  const ph=OUT.qw[2]; const p=PHASES.find(x=>x.n===ph);
+  $("phaseTxt").textContent=`${ph} · ${p?p.t.split(" ·")[0]:"?"}`;
+  // lampade
+  $("Lg").classList.toggle("on",!!q[5]); $("Lv").classList.toggle("on",!!q[6]); $("Lr").classList.toggle("on",!!q[7]);
+  // sequenza
+  drawSteps(ph);
+  // allarme
+  const ab=$("alarmBox"), a=OUT.qw[4];
+  if(OP.mush || (q[7] && !a)){ ab.className="alarm show e"; ab.textContent = OP.mush ? "EMERGENZA: fungo premuto. Sblocca il fungo e premi RESET, poi START." : "EMERGENZA memorizzata: premi RESET, poi START per riprendere."; }
+  else if(a){ ab.className="alarm show a"; ab.textContent=`ALLARME ${a}: ${ALARMS[a]||"codice sconosciuto"} — elimina la causa, RESET, poi START.`; }
+  else ab.className="alarm";
+  // I/O
+  IN_MAP.forEach((m,i)=>{ const v=mw[i]; $("vi"+i).innerHTML = i===9 ? (v/10).toFixed(1)+" °C <small style='color:#4d5f82'>("+v+")</small>" : `<span class="led ${v?'on':''}"></span>`; });
+  OUT_MAP.forEach((m,i)=>{ $("vo"+i).innerHTML = i<8 ? `<span class="led ${q[i]?'ono':''}"></span>` : String(OUT.qw[i-8]); });
+  // avvisi
+  const bn=$("banner"); const html=(P.warn||[]).map(w=>`<div class="toast ${w[0]}">${w[1]}</div>`).join(""); if(bn._h!==html){ bn.innerHTML=html; bn._h=html; }
+  drawTrend();
+}
+function drawSteps(ph){
+  const order=PHASES.map(p=>p.n); const idx=order.indexOf(ph);
+  const sc=stationCrate();
+  PHASES.forEach((p,i)=>{ const li=$("ph"+p.n); const act=p.n===ph;
+    li.classList.toggle("act",act);
+    const done = ph===110 ? p.n<110 : (p.sub ? (idx>i && order[idx]>=40) : (idx>i));
+    li.classList.toggle("done", !act && done && ph!==0);
+    let prog=null, v="";
+    if(act){
+      switch(p.n){
+        case 10: prog=P.vol/80; v=P.vol.toFixed(0)+" L"; break;
+        case 20: prog=OUT.qw[5]/5; v=OUT.qw[5]+"/5"; break;
+        case 30: prog=phaseAcc/300; v=fmtMin(Math.min(phaseAcc,300)); break;
+        case 50: prog=sc? sc.vol/20 : 0; v=sc? sc.vol.toFixed(1)+" L":"no cassa"; break;
+        case 60: prog=sc? (sc.T-20)/70:0; v=sc? sc.T.toFixed(0)+" °C":""; break;
+        case 70: prog=phaseAcc/1200; v=fmtMin(Math.min(phaseAcc,1200)); break;
+        case 80: prog=sc? (90-sc.T)/30:0; v=sc? sc.T.toFixed(0)+" °C":""; break;
+        case 90: prog=phaseAcc/300; v=fmtMin(Math.min(phaseAcc,300)); break;
+        case 100: case 40: v="cassa "+(OUT.qw[3]+1)+"/4"; break;
+      }
+    }
+    li.querySelector(".v").textContent=v;
+    const bar=li.querySelector(".bar i"); bar.style.width = prog==null? "0%" : (clamp(prog,0,1)*100).toFixed(1)+"%";
+  });
+  $("seqInfo").textContent = `casse ${OUT.qw[3]}/4 · panetti ${OUT.qw[5]}/5`;
+}
+const cv=$("trend"), cx=cv.getContext("2d");
+function drawTrend(){
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=250;
+  if(cv.width!==Math.round(W*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+  cx.setTransform(dpr,0,0,dpr,0,0); cx.clearRect(0,0,W,H);
+  const L=40,R=W-12,T=14,B=H-26, span=45*60, t1=Math.max(P.proc,span), t0=t1-span;
+  const X=t=>L+(t-t0)/span*(R-L), Y=v=>B-(v/130)*(B-T);
+  cx.font="10px ui-monospace,monospace"; cx.fillStyle="#4d5f82"; cx.strokeStyle="#ffffff0d"; cx.lineWidth=1;
+  for(let v=0;v<=120;v+=20){ cx.beginPath(); cx.moveTo(L,Y(v)); cx.lineTo(R,Y(v)); cx.stroke(); cx.fillText(v+"°",8,Y(v)+3); }
+  for(let m=Math.ceil(t0/300)*300;m<=t1;m+=300){ cx.beginPath(); cx.moveTo(X(m),T); cx.lineTo(X(m),B); cx.stroke(); cx.fillText(Math.round(m/60)+"′",X(m)-8,H-9); }
+  [[90,"#ff8a3d"],[60,"#ffd23f"]].forEach(([v,c])=>{ cx.setLineDash([6,5]); cx.strokeStyle=c+"99"; cx.beginPath(); cx.moveTo(L,Y(v)); cx.lineTo(R,Y(v)); cx.stroke(); cx.setLineDash([]); cx.fillStyle=c; cx.fillText(v+" °C",R-40,Y(v)-4); });
+  const pts=P.trend.filter(p=>p.t>=t0);
+  cx.setLineDash([3,4]); cx.strokeStyle="#a78bfa"; cx.lineWidth=1.5; cx.beginPath(); pts.forEach((p,i)=>{ const yy=Y(Math.max(20,12*p.V)); i?cx.lineTo(X(p.t),yy):cx.moveTo(X(p.t),yy); }); cx.stroke(); cx.setLineDash([]);
+  const grad=cx.createLinearGradient(0,Y(120),0,Y(20)); grad.addColorStop(0,"#ff4d1f"); grad.addColorStop(.4,"#ffb547"); grad.addColorStop(1,"#3aa8ff");
+  cx.strokeStyle=grad; cx.lineWidth=2.5; cx.beginPath(); let pen=false;
+  pts.forEach(p=>{ if(p.T==null){pen=false;return;} pen?cx.lineTo(X(p.t),Y(p.T)):cx.moveTo(X(p.t),Y(p.T)); pen=true; }); cx.stroke();
+  const last=pts[pts.length-1]; if(last&&last.T!=null){ cx.fillStyle="#fff"; cx.beginPath(); cx.arc(X(last.t),Y(last.T),3.5,0,7); cx.fill(); }
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

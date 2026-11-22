@@ -1,0 +1,9 @@
+[project]
+name = "bridge-impianto-chimico"
+version = "1.0.0"
+description = "Bridge WebSocket <-> Modbus TCP tra lo SCADA didattico e OpenPLC"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp>=3.9",
+    "pymodbus>=3.6",
+]
